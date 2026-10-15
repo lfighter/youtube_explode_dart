@@ -166,35 +166,31 @@ extension StringUtility2 on String? {
     return false;
   }
 
-  /// Format: {quantity} {unit} ago (5 years ago)
+  /// The quantity and unit right before "ago", wherever they sit in the text.
+  /// At most four digits, whole: no age YouTube renders is longer, and a
+  /// longer one would put the date outside what [DateTime] can hold.
+  static final _age = RegExp(r'(?<!\d)(\d{1,4})(?!\d)\s*([a-z]+)\s+ago\b');
+
+  /// The moment an age such as "5 years ago", "16h ago" or "Streamed 2 days
+  /// ago" points at, or null when the text names no age.
+  ///
+  /// Never throws. An upload date is optional on every model that reads one,
+  /// and text YouTube renders for something with no age — "PREMIERE",
+  /// "Premieres in 3 hours", "Streamed live on Jan 5, 2020" — or with a
+  /// prefix in front of the compact form ("Streamed 16h ago") used to reach
+  /// `int.parse` and throw: out of a whole search page, a channel's uploads or
+  /// a playlist, for one item's date (upstream issue #309).
   DateTime? toDateTime() {
-    if (this == null) {
+    final text = this?.trim().toLowerCase();
+    if (text == null || text.isEmpty) {
       return null;
     }
-
-    var parts = this!.trim().split(' ');
-    if (parts.length == 4) {
-      // Streamed x y ago
-      parts = parts.skip(1).toList();
-    }
-
-    // Compact format: "16h ago", "1mo ago", "3y ago".
-    if (parts.length == 2 && parts[1] == 'ago') {
-      final match = RegExp(r'^(\d+)([a-z]+)$').firstMatch(parts.first);
-      if (match == null) {
-        return null;
-      }
-      parts = [match.group(1)!, match.group(2)!, 'ago'];
-    }
-
-    if (parts.length != 3) {
+    final match = _age.firstMatch(text);
+    if (match == null) {
       return null;
     }
-
-    final qty = int.parse(parts.first);
-
-    // Try to get the unit
-    final unit = parts[1];
+    final qty = int.parse(match.group(1)!);
+    final unit = match.group(2)!;
 
     final time = switch (unit) {
       _ when unit.startsWith('second') || unit == 's' => Duration(seconds: qty),
@@ -206,11 +202,10 @@ extension StringUtility2 on String? {
       _ when unit.startsWith('day') || unit == 'd' => Duration(days: qty),
       _ when unit.startsWith('week') || unit == 'w' => Duration(days: qty * 7),
       _ when unit.startsWith('year') || unit == 'y' => Duration(days: qty * 365),
-      _ => throw StateError("Couldn't parse $unit unit of time. "
-          'Please report this to the project page!')
+      _ => null,
     };
 
-    return DateTime.now().subtract(time);
+    return time == null ? null : DateTime.now().subtract(time);
   }
 
   Uri? toUri() {
