@@ -21,6 +21,7 @@ discovery modes the gallery uses were broken as of 2026-08-16.
 | `4ddda22` | upstream PR [#383](https://github.com/Hexer10/youtube_explode_dart/pull/383) | `channels.getUploads` returned an empty stream — YouTube moved to `lockupViewModel` |
 | `d0e3b60` | upstream PR [#380](https://github.com/Hexer10/youtube_explode_dart/pull/380) | `playlists.getVideos` returned an empty stream — same `lockupViewModel` change |
 | `fd14836` | written here, **unreported upstream** | `NoSuchMethodError` on any search whose results include a live stream |
+| `e52984a` | written here, upstream issue [#309](https://github.com/Hexer10/youtube_explode_dart/issues/309) | `FormatException` from any search, channel upload list or playlist holding a past live stream |
 
 The third one is worth understanding: `getT` is an extension method on `Map`,
 and Dart resolves extension methods *statically*. All three call sites in
@@ -30,24 +31,25 @@ That branch is only reached when `viewCountText` carries `runs` instead of
 `simpleText` — which is what live streams produce — so broad queries like
 "music" or "news" failed every time while narrow ones worked.
 
+The fourth broke the same queries again by 2026-10-15. `toDateTime` dropped
+a leading word only from four-word text ("Streamed 2 days ago"), and YouTube
+also renders the compact form with that prefix, "Streamed 16h ago" — three
+words, so `int.parse("Streamed")` threw, and the exception took the whole
+page with it rather than one item's date. The age is now found by pattern
+(the number and unit right before "ago"), and text with no age —
+`PREMIERE`, "Premieres in 3 hours", an absolute date — is a null date
+instead of a throw. `test/upload_date_test.dart` covers it offline.
+
 ## Deliberately not applied
 
 - PR [#385](https://github.com/Hexer10/youtube_explode_dart/pull/385)
   (`getRelatedVideos`, shorts) — touches 20 files including the example app's
   Gradle setup, and conflicts with #383 in `channel_upload_page.dart`.
-  `getRelatedVideos` does return results here; see the `Streamed`/`PREMIERE`
-  note below for the part that actually bites.
+  `getRelatedVideos` does return results here, and since `e52984a` no
+  longer throws on `Streamed`/`PREMIERE` items either.
 - PR [#382](https://github.com/Hexer10/youtube_explode_dart/pull/382) (bumps
   the hardcoded WEB client version) — its own author says they could not
   reproduce the problem it fixes.
-
-## Known remaining problems
-
-- Upstream issue [#309](https://github.com/Hexer10/youtube_explode_dart/issues/309):
-  items labelled `PREMIERE` or `Streamed …` are fed to `int.parse`, throwing
-  `FormatException`. Hits `getRelatedVideos` intermittently. The gallery
-  tolerates it — `YtService.relatedTracks` catches and falls back to a keyword
-  search — so autoplay degrades rather than breaking.
 
 ## Updating
 
