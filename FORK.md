@@ -22,6 +22,7 @@ discovery modes the gallery uses were broken as of 2026-08-16.
 | `d0e3b60` | upstream PR [#380](https://github.com/Hexer10/youtube_explode_dart/pull/380) | `playlists.getVideos` returned an empty stream — same `lockupViewModel` change |
 | `fd14836` | written here, **unreported upstream** | `NoSuchMethodError` on any search whose results include a live stream |
 | `e52984a` | written here, upstream issue [#309](https://github.com/Hexer10/youtube_explode_dart/issues/309) | `FormatException` from any search, channel upload list or playlist holding a past live stream |
+| `09ff1ad` | written here, **unreported upstream** | the client-selection probe's bare HEAD drew a 403 from the media CDN for large streams, rejecting clients that serve them; it now asks for `Range: bytes=0-1` |
 
 The third one is worth understanding: `getT` is an extension method on `Map`,
 and Dart resolves extension methods *statically*. All three call sites in
