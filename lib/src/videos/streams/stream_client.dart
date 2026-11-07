@@ -105,7 +105,19 @@ class StreamClient {
             );
           }
 
-          final response = await _httpClient.head(streams.first.url);
+          // Probe with a Range header, not a bare HEAD.
+          //
+          // Google's media CDN answers 403 to an unranged request for a large
+          // stream, so a bare HEAD rejected clients that serve the video
+          // perfectly well — and did so non-deterministically, which made the
+          // whole client-selection step look flaky. `_getStream` below already
+          // ranges its requests for exactly this reason. (The probe does not
+          // "use up" the URL: a stream that refuses the download refuses it
+          // with the probe disabled too.)
+          final response = await _httpClient.head(
+            streams.first.url,
+            headers: const {'Range': 'bytes=0-1'},
+          );
           if (response.statusCode == 403) {
             throw YoutubeExplodeException(
               'Video $videoId returned 403 (stream: ${streams.first.tag})',
